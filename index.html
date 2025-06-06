@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>App Motorista - Monitoramento</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="icon" href="icon-192.png" />
+  <style>
+    body { font-family: Arial, sans-serif; padding: 15px; }
+    label, input, button { font-size: 16px; margin: 8px 0; }
+    input { width: 100%; padding: 8px; }
+    button { padding: 10px 15px; font-weight: bold; cursor: pointer; }
+    #status { margin-top: 10px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>App Motorista - Monitoramento</h2>
+  <form id="form">
+    <label for="pedido">Número do pedido:</label><br />
+    <input type="text" id="pedido" name="pedido" required /><br />
+    <label for="nome">Nome do motorista ou placa:</label><br />
+    <input type="text" id="nome" name="nome" required /><br />
+    <button type="submit" id="startBtn">Iniciar envio de localização</button>
+    <button type="button" id="stopBtn" disabled>Parar envio de localização</button>
+  </form>
+  <div id="status"></div>
+
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBjefvlYV6HnWFg6E_hbAZFEgrtwPlFnp8",
+      authDomain: "monitoramento-de-pedidos-ecb12.firebaseapp.com",
+      databaseURL: "https://monitoramento-de-pedidos-ecb12-default-rtdb.firebaseio.com",
+      projectId: "monitoramento-de-pedidos-ecb12",
+      storageBucket: "monitoramento-de-pedidos-ecb12.firebasestorage.app",
+      messagingSenderId: "595096252560",
+      appId: "1:595096252560:web:5ed08df61889b7ea166815"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    let watchId = null;
+    const statusDiv = document.getElementById("status");
+    const form = document.getElementById("form");
+    const startBtn = document.getElementById("startBtn");
+    const stopBtn = document.getElementById("stopBtn");
+
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      const pedido = document.getElementById("pedido").value.trim();
+      const nome = document.getElementById("nome").value.trim();
+      if (!pedido || !nome) {
+        alert("Preencha todos os campos!");
+        return;
+      }
+      if (watchId !== null) {
+        alert("Envio já iniciado!");
+        return;
+      }
+      statusDiv.textContent = "Iniciando envio de localização...";
+      watchId = navigator.geolocation.watchPosition(
+        position => {
+          const { latitude, longitude } = position.coords;
+          database.ref(`motoristas/${pedido}`).set({
+            pedido, nome, latitude, longitude, timestamp: Date.now()
+          });
+          statusDiv.textContent = `Enviando: Lat ${latitude.toFixed(6)}, Lng ${longitude.toFixed(6)}`;
+        },
+        error => {
+          statusDiv.textContent = `Erro: ${error.message}`;
+        },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 10000 }
+      );
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+    });
+
+    stopBtn.addEventListener("click", () => {
+      if (watchId !== null) {
+        navigator.geolocation.clearWatch(watchId);
+        watchId = null;
+        statusDiv.textContent = "Envio de localização parado.";
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+      }
+    });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js')
+        .then(() => console.log('Service Worker registrado.'));
+    }
+  </script>
+</body>
+</html>
